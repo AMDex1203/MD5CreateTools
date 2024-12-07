@@ -9,7 +9,7 @@ namespace Tester
     {
         static void Main(string[] args)
         {
-            Console.Title = "Point Blank - System Server";
+            Console.Title = "MD5 Create Tools";
             Console.ForegroundColor = ConsoleColor.DarkBlue;
             Console.WriteLine(" --------------------------------------------------------");
             Console.ResetColor();
