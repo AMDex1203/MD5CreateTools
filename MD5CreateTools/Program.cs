@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Xml.Linq;
 
 namespace Tester
 {
@@ -34,6 +35,7 @@ namespace Tester
             Console.WriteLine("Pilih opsi:");
             Console.WriteLine("1. Scan MD5 di dalam folder PACK");
             Console.WriteLine("2. Scanning MD5 semua file termasuk program");
+            Console.WriteLine("3. Create UserFileList.dat File");
 
             int pilihan = Convert.ToInt32(Console.ReadLine());
 
@@ -44,6 +46,9 @@ namespace Tester
                     break;
                 case 2:
                     ScanMD5Semua();
+                    break;
+                case 3:
+                    CreateUserFileList();
                     break;
                 default:
                     Console.WriteLine("Pilihan tidak valid.");
@@ -111,6 +116,51 @@ namespace Tester
             catch (Exception ex)
             {
                 Console.WriteLine("Terjadi kesalahan: " + ex.Message);
+            }
+        }
+        public static async void CreateUserFileList()
+        {
+            try
+            {
+                string directoryPath = Directory.GetCurrentDirectory();
+                string hashList = "";
+
+                // Buat header XML
+                hashList += "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+                hashList += "<list>\n";
+
+                foreach (string filePath in Directory.EnumerateFiles(directoryPath, "*.*", SearchOption.AllDirectories))
+                {
+                    string fileName = Path.GetFileName(filePath);
+                    string fileExtension = Path.GetExtension(filePath);
+                    string localPath = filePath.Replace(directoryPath, "");
+
+                    using (FileStream stream = File.OpenRead(filePath))
+                    {
+                        MD5 md5 = MD5.Create();
+                        byte[] hash = md5.ComputeHash(stream);
+                        string hashString = BitConverter.ToString(hash).Replace("-", "").ToLower();
+
+                        // Tambahkan elemen file ke XML
+                        hashList += $"  <file local=\"{localPath}\" hash=\"{hashString}\" />\n";
+                    }
+                }
+
+                // Tutup elemen list
+                hashList += "</list>\n";
+
+                // Simpan hash list ke file
+                string hashListFilePath = Path.Combine(directoryPath, "UserFileList.dat");
+                using (StreamWriter writer = new StreamWriter(hashListFilePath))
+                {
+                    await writer.WriteAsync(hashList);
+                }
+
+                Console.WriteLine("Hash list telah disimpan ke file.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Kesalahan: " + ex.Message);
             }
         }
 
