@@ -1,7 +1,9 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Text;
 using System.Xml.Linq;
 
 namespace Tester
@@ -36,6 +38,7 @@ namespace Tester
             Console.WriteLine("1. Scan MD5 di dalam folder PACK");
             Console.WriteLine("2. Scanning MD5 semua file termasuk program");
             Console.WriteLine("3. Create UserFileList.dat File");
+            Console.WriteLine("4. Encrypted UserFileList.dat");
 
             int pilihan = Convert.ToInt32(Console.ReadLine());
 
@@ -49,6 +52,9 @@ namespace Tester
                     break;
                 case 3:
                     CreateUserFileList();
+                    break;
+                case 4:
+                    EnkripsiAES();
                     break;
                 default:
                     Console.WriteLine("Pilihan tidak valid.");
@@ -163,6 +169,45 @@ namespace Tester
                 Console.WriteLine("Kesalahan: " + ex.Message);
             }
         }
+        static void EnkripsiAES()
+        {
+            Console.Write("Masukkan teks yang ingin dienkripsi: ");
+            string teks = Console.ReadLine();
 
+            Console.Write("Masukkan kunci enkripsi (16 karakter): ");
+            string kunci = Console.ReadLine();
+
+            Console.Write("Masukkan vektor inisialisasi (16 karakter): ");
+            string iv = Console.ReadLine();
+
+            string hasilEnkripsi = Enkripsi(teks, kunci, iv);
+
+            Console.WriteLine("Hasil Enkripsi: " + hasilEnkripsi);
+            Console.ReadKey();
+        }
+        static string Enkripsi(string teks, string kunci, string iv)
+        {
+            byte[] kunciBytes = Encoding.UTF8.GetBytes(kunci);
+            byte[] ivBytes = Encoding.UTF8.GetBytes(iv);
+            byte[] teksBytes = Encoding.UTF8.GetBytes(teks);
+
+            using (Aes aes = Aes.Create())
+            {
+                aes.Key = kunciBytes;
+                aes.IV = ivBytes;
+
+                ICryptoTransform encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
+
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    using (CryptoStream cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
+                    {
+                        cs.Write(teksBytes, 0, teksBytes.Length);
+                    }
+
+                    return Convert.ToBase64String(ms.ToArray());
+                }
+            }
+        }
     }
 }
