@@ -54,7 +54,7 @@ namespace Tester
                     CreateUserFileList();
                     break;
                 case 4:
-                    EnkripsiAES();
+                    EncryptionFileScript();
                     break;
                 default:
                     Console.WriteLine("Pilihan tidak valid.");
@@ -130,6 +130,7 @@ namespace Tester
             {
                 string directoryPath = Directory.GetCurrentDirectory();
                 string hashList = "";
+                string password = "your_password"; // Ganti dengan password yang Anda inginkan
 
                 // Buat header XML
                 hashList += "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
@@ -147,19 +148,25 @@ namespace Tester
                         byte[] hash = md5.ComputeHash(stream);
                         string hashString = BitConverter.ToString(hash).Replace("-", "").ToLower();
 
+                        // Enkripsi hashString menggunakan Chipper
+                        string encryptedHashString = ChipperEncryption.Encrypt(hashString, password);
+
                         // Tambahkan elemen file ke XML
-                        hashList += $"  <file local=\"{localPath}\" hash=\"{hashString}\" />\n";
+                        hashList += $" <file local=\"{localPath}\" hash=\"{encryptedHashString}\" />\n";
                     }
                 }
 
                 // Tutup elemen list
                 hashList += "</list>\n";
 
+                // Enkripsi hashList menggunakan Chipper
+                string encryptedHashList = ChipperEncryption.Encrypt(hashList, password);
+
                 // Simpan hash list ke file
                 string hashListFilePath = Path.Combine(directoryPath, "UserFileList.dat");
                 using (StreamWriter writer = new StreamWriter(hashListFilePath))
                 {
-                    await writer.WriteAsync(hashList);
+                    await writer.WriteAsync(encryptedHashList);
                 }
 
                 Console.WriteLine("Hash list telah disimpan ke file.");
@@ -169,45 +176,91 @@ namespace Tester
                 Console.WriteLine("Kesalahan: " + ex.Message);
             }
         }
-        static void EnkripsiAES()
+
+        public static class ChipperEncryption
         {
-            Console.Write("Masukkan teks yang ingin dienkripsi: ");
-            string teks = Console.ReadLine();
-
-            Console.Write("Masukkan kunci enkripsi (16 karakter): ");
-            string kunci = Console.ReadLine();
-
-            Console.Write("Masukkan vektor inisialisasi (16 karakter): ");
-            string iv = Console.ReadLine();
-
-            string hasilEnkripsi = Enkripsi(teks, kunci, iv);
-
-            Console.WriteLine("Hasil Enkripsi: " + hasilEnkripsi);
-            Console.ReadKey();
-        }
-        static string Enkripsi(string teks, string kunci, string iv)
-        {
-            byte[] kunciBytes = Encoding.UTF8.GetBytes(kunci);
-            byte[] ivBytes = Encoding.UTF8.GetBytes(iv);
-            byte[] teksBytes = Encoding.UTF8.GetBytes(teks);
-
-            using (Aes aes = Aes.Create())
+            public static string Encrypt(string plaintext, string password)
             {
-                aes.Key = kunciBytes;
-                aes.IV = ivBytes;
+                string encryptedText = "";
+                int key = 0;
 
-                ICryptoTransform encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
-
-                using (MemoryStream ms = new MemoryStream())
+                foreach (char c in plaintext)
                 {
-                    using (CryptoStream cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
-                    {
-                        cs.Write(teksBytes, 0, teksBytes.Length);
-                    }
-
-                    return Convert.ToBase64String(ms.ToArray());
+                    key = password[key % password.Length];
+                    encryptedText += (char)(c + key);
                 }
+
+                return encryptedText;
             }
+
+            public static string Decrypt(string ciphertext, string password)
+            {
+                string decryptedText = "";
+                int key = 0;
+
+                foreach (char c in ciphertext)
+                {
+                    key = password[key % password.Length];
+                    decryptedText += (char)(c - key);
+                }
+
+                return decryptedText;
+            }
+        }
+
+        private static void EncryptionFileScript()
+        {
+            string filePath = "Script(2).i3Pack";
+            string password = "your_password"; // Ganti dengan password yang Anda inginkan
+
+            EncryptFile(filePath, password);
+            Console.WriteLine("File telah dienkripsi.");
+
+            // Untuk mendekripsi file
+            // ChipperEncryption.DecryptFile(filePath, password);
+            // Console.WriteLine("File telah didekripsi.");
+        }
+
+        public static void EncryptFile(string filePath, string password)
+        {
+            byte[] fileBytes = File.ReadAllBytes(filePath);
+            byte[] encryptedBytes = Encrypt(fileBytes, password);
+            File.WriteAllBytes(filePath, encryptedBytes);
+        }
+
+        public static void DecryptFile(string filePath, string password)
+        {
+            byte[] fileBytes = File.ReadAllBytes(filePath);
+            byte[] decryptedBytes = Decrypt(fileBytes, password);
+            File.WriteAllBytes(filePath, decryptedBytes);
+        }
+
+        private static byte[] Encrypt(byte[] plaintextBytes, string password)
+        {
+            byte[] encryptedBytes = new byte[plaintextBytes.Length];
+            int key = 0;
+
+            for (int i = 0; i < plaintextBytes.Length; i++)
+            {
+                key = password[key % password.Length];
+                encryptedBytes[i] = (byte)(plaintextBytes[i] + key);
+            }
+
+            return encryptedBytes;
+        }
+
+        private static byte[] Decrypt(byte[] ciphertextBytes, string password)
+        {
+            byte[] decryptedBytes = new byte[ciphertextBytes.Length];
+            int key = 0;
+
+            for (int i = 0; i < ciphertextBytes.Length; i++)
+            {
+                key = password[key % password.Length];
+                decryptedBytes[i] = (byte)(ciphertextBytes[i] - key);
+            }
+
+            return decryptedBytes;
         }
     }
 }
