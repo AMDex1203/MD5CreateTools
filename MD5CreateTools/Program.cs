@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 
 namespace Tester
@@ -38,7 +39,11 @@ namespace Tester
             Console.WriteLine("1. Scan MD5 di dalam folder PACK");
             Console.WriteLine("2. Scanning MD5 semua file termasuk program");
             Console.WriteLine("3. Create UserFileList.dat File");
-            Console.WriteLine("4. Encrypted UserFileList.dat");
+            Console.WriteLine("4. Encrypted File Script.i3Pack");
+            Console.WriteLine("5. Decrypt UserFileList.dat");
+            Console.WriteLine("6. Create UserFileList.dat File from Pack Folder");
+            Console.WriteLine("7. Create MD5 UserFileList tanpa enkripsi");
+            Console.WriteLine(" --------------------------------------------------------");
 
             int pilihan = Convert.ToInt32(Console.ReadLine());
 
@@ -55,6 +60,15 @@ namespace Tester
                     break;
                 case 4:
                     EncryptionFileScript();
+                    break;
+                case 5:
+                    DecryptUserFileList().Wait();
+                    break;
+                case 6:
+                    CreateUserFileListFromPack();
+                    break;
+                case 7:
+                    CreateUserFileListNoEncryption();
                     break;
                 default:
                     Console.WriteLine("Pilihan tidak valid.");
@@ -124,13 +138,16 @@ namespace Tester
                 Console.WriteLine("Terjadi kesalahan: " + ex.Message);
             }
         }
+
         public static async void CreateUserFileList()
         {
             try
             {
+                Console.Write("Enter encryption password: ");
+                string password = Console.ReadLine();
+
                 string directoryPath = Directory.GetCurrentDirectory();
                 string hashList = "";
-                string password = "your_password"; // Ganti dengan password yang Anda inginkan
 
                 // Buat header XML
                 hashList += "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
@@ -170,6 +187,136 @@ namespace Tester
                 }
 
                 Console.WriteLine("Hash list telah disimpan ke file.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Kesalahan: " + ex.Message);
+            }
+        }
+
+        public static async void CreateUserFileListFromPack()
+        {
+            try
+            {
+                Console.Write("Enter encryption password: ");
+                string password = Console.ReadLine();
+
+                string packFolderPath = Path.Combine(Directory.GetCurrentDirectory(), "Pack");
+                if (!Directory.Exists(packFolderPath))
+                {
+                    Console.WriteLine("Folder 'Pack' tidak ditemukan.");
+                    return;
+                }
+
+                string hashList = "";
+                // Build XML header
+                hashList += "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+                hashList += "<list>\n";
+
+                foreach (string filePath in Directory.EnumerateFiles(packFolderPath, "*.*", SearchOption.AllDirectories))
+                {
+                    string localPath = filePath.Replace(Directory.GetCurrentDirectory(), "");
+                    using (FileStream stream = File.OpenRead(filePath))
+                    {
+                        MD5 md5 = MD5.Create();
+                        byte[] hash = md5.ComputeHash(stream);
+                        string hashString = BitConverter.ToString(hash).Replace("-", "").ToLower();
+
+                        // Encrypt hashString using Chipper
+                        string encryptedHashString = ChipperEncryption.Encrypt(hashString, password);
+
+                        // Append file element to XML
+                        hashList += $" <file local=\"{localPath}\" hash=\"{encryptedHashString}\" />\n";
+                    }
+                }
+
+                // Close XML list element
+                hashList += "</list>\n";
+
+                // Encrypt the entire XML content using Chipper
+                string encryptedHashList = ChipperEncryption.Encrypt(hashList, password);
+
+                // Save encrypted content to UserFileList.dat
+                string hashListFilePath = Path.Combine(Directory.GetCurrentDirectory(), "UserFileList.dat");
+                using (StreamWriter writer = new StreamWriter(hashListFilePath))
+                {
+                    await writer.WriteAsync(encryptedHashList);
+                }
+
+                Console.WriteLine("UserFileList.dat untuk folder 'Pack' telah disimpan.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Kesalahan: " + ex.Message);
+            }
+        }
+
+        public static async void CreateUserFileListNoEncryption()
+        {
+            try
+            {
+                string directoryPath = Directory.GetCurrentDirectory();
+                string hashList = "";
+
+                // Build XML header
+                hashList += "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+                hashList += "<list>\n";
+
+                foreach (string filePath in Directory.EnumerateFiles(directoryPath, "*.*", SearchOption.AllDirectories))
+                {
+                    string localPath = filePath.Replace(directoryPath, "");
+                    using (FileStream stream = File.OpenRead(filePath))
+                    {
+                        MD5 md5 = MD5.Create();
+                        byte[] hash = md5.ComputeHash(stream);
+                        string hashString = BitConverter.ToString(hash).Replace("-", "").ToLower();
+
+                        // Tanpa enkripsi, langsung tambahkan ke XML
+                        hashList += $" <file local=\"{localPath}\" hash=\"{hashString}\" />\n";
+                    }
+                }
+
+                // Close XML list element
+                hashList += "</list>\n";
+
+                // Save plain XML hash list ke file
+                string hashListFilePath = Path.Combine(directoryPath, "UserFileList_NoEncryption.dat");
+                using (StreamWriter writer = new StreamWriter(hashListFilePath))
+                {
+                    await writer.WriteAsync(hashList);
+                }
+
+                Console.WriteLine("UserFileList tanpa enkripsi telah disimpan.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Kesalahan: " + ex.Message);
+            }
+        }
+
+        public static async Task DecryptUserFileList()
+        {
+            try
+            {
+                Console.Write("Enter decryption password: ");
+                string password = Console.ReadLine();
+                string directoryPath = Directory.GetCurrentDirectory();
+                string hashListFilePath = Path.Combine(directoryPath, "UserFileList.dat");
+
+                if (!File.Exists(hashListFilePath))
+                {
+                    Console.WriteLine("File UserFileList.dat tidak ditemukan.");
+                    return;
+                }
+
+                string encryptedHashList = File.ReadAllText(hashListFilePath);
+                string decryptedHashList = ChipperEncryption.Decrypt(encryptedHashList, password);
+
+                Console.WriteLine("Isi file setelah dekripsi:");
+                Console.WriteLine("--------------------------------------------------");
+                Console.WriteLine(decryptedHashList);
+                Console.WriteLine("--------------------------------------------------");
+                await Task.Delay(3000);
             }
             catch (Exception ex)
             {
